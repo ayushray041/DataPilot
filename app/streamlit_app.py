@@ -4,10 +4,22 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
+
+import sys
+from pathlib import Path
+
 import streamlit as st
 from pandas.api.types import is_bool_dtype, is_complex_dtype, is_numeric_dtype
 
+# Add the project root to Python's import path.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Import the project's own modules after setting the path.
 from agent.agent import DataAgent
+
 from tools.visualization import (
     create_bar_chart,
     create_histogram,
