@@ -5,6 +5,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from google.genai import Client
+import streamlit as st
+from streamlit.errors import StreamlitSecretNotFoundError
 
 
 # Resolve the project root from this file so loading works from any working directory.
@@ -14,30 +16,45 @@ load_dotenv(PROJECT_ROOT / ".env")
 DEFAULT_MODEL_NAME = "gemini-3.8-flash"
 
 
-def get_client() -> Client:
-    """Create a Gemini client using the API key from the root environment file.
+def _get_setting(name: str) -> str | None:
+    """Return a non-blank setting from the environment or Streamlit secrets."""
+    value = os.getenv(name)
+    if value is not None and value.strip():
+        return value
 
-    Returns:
-        A configured Google GenAI client.
+    try:
+        value = st.secrets.get(name)
+    except StreamlitSecretNotFoundError:
+        return None
+
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
+def get_client() -> Client:
+    """Create a Gemini client using the configured API key.
+
+    The key is read from the environment (including the root ``.env`` file),
+    then from Streamlit secrets when it is not configured there.
 
     Raises:
-        RuntimeError: If GEMINI_API_KEY is not set or contains only whitespace.
+        RuntimeError: If no non-blank GEMINI_API_KEY is configured.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if api_key is None or not api_key.strip():
+    api_key = _get_setting("GEMINI_API_KEY")
+    if api_key is None:
         raise RuntimeError(
-            "GEMINI_API_KEY must be set in the root .env file before using Gemini."
+            "GEMINI_API_KEY must be configured in the environment, root .env "
+            "file, or Streamlit secrets before using Gemini."
         )
 
     return Client(api_key=api_key)
 
 
 def get_model_name() -> str:
-    """Return the configured Gemini model name or the project default.
+    """Return the configured Gemini model name or the existing project default.
 
-    A missing or whitespace-only GEMINI_MODEL setting uses the default model.
+    The environment is checked first, followed by Streamlit secrets. Missing
+    or blank values use ``DEFAULT_MODEL_NAME``.
     """
-    model_name = os.getenv("GEMINI_MODEL")
-    if model_name is None or not model_name.strip():
-        return DEFAULT_MODEL_NAME
-    return model_name
+    return _get_setting("GEMINI_MODEL") or DEFAULT_MODEL_NAME
